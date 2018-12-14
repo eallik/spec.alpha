@@ -8,116 +8,123 @@
 
 (ns clojure.spec.gen.alpha
     (:refer-clojure :exclude [boolean bytes cat hash-map list map not-empty set vector
-                              char double int keyword symbol string uuid delay shuffle]))
+                              char double int keyword symbol string uuid delay shuffle])
+    
+(:require [clojure.test.check.generators :refer [any any-printable boolean bytes char char-alpha char-alphanumeric char-ascii double
+            int keyword keyword-ns large-integer ratio simple-type simple-type-printable
+            string string-ascii string-alphanumeric symbol symbol-ns uuid]])
+(:require [clojure.test.check.generators :refer [hash-map list map not-empty set vector vector-distinct fmap elements
+                  bind choose fmap one-of such-that tuple sample return
+                  large-integer* double* frequency shuffle]]))
 
 (alias 'c 'clojure.core)
 
-(defonce ^:private dynalock (Object.))
+;; (defonce ^:private dynalock (Object.))
 
-(defn- dynaload
-  [s]
-  (let [ns (namespace s)]
-    (assert ns)
-    (locking dynalock
-      (require (c/symbol ns)))
-    (let [v (resolve s)]
-      (if v
-        @v
-        (throw (RuntimeException. (str "Var " s " is not on the classpath")))))))
+;; (defn- dynaload
+;;   [s]
+;;   (let [ns (namespace s)]
+;;     (assert ns)
+;;     (locking dynalock
+;;       (require (c/symbol ns)))
+;;     (let [v (resolve s)]
+;;       (if v
+;;         @v
+;;         (throw (RuntimeException. (str "Var " s " is not on the classpath")))))))
 
-(def ^:private quick-check-ref
-     (c/delay (dynaload 'clojure.test.check/quick-check)))
-(defn quick-check
-  [& args]
-  (apply @quick-check-ref args))
+;; (def ^:private quick-check-ref
+;;      (c/delay (dynaload 'clojure.test.check/quick-check)))
+;; (defn quick-check
+;;   [& args]
+;;   (apply @quick-check-ref args))
 
-(def ^:private for-all*-ref
-     (c/delay (dynaload 'clojure.test.check.properties/for-all*)))
-(defn for-all*
-  "Dynamically loaded clojure.test.check.properties/for-all*."
-  [& args]
-  (apply @for-all*-ref args))
+;; (def ^:private for-all*-ref
+;;      (c/delay (dynaload 'clojure.test.check.properties/for-all*)))
+;; (defn for-all*
+;;   "Dynamically loaded clojure.test.check.properties/for-all*."
+;;   [& args]
+;;   (apply @for-all*-ref args))
 
-(let [g? (c/delay (dynaload 'clojure.test.check.generators/generator?))
-      g (c/delay (dynaload 'clojure.test.check.generators/generate))
-      mkg (c/delay (dynaload 'clojure.test.check.generators/->Generator))]
-  (defn- generator?
-    [x]
-    (@g? x))
-  (defn- generator
-    [gfn]
-    (@mkg gfn))
-  (defn generate
-    "Generate a single value using generator."
-    [generator]
-    (@g generator)))
+;; (let [g? (c/delay (dynaload 'clojure.test.check.generators/generator?))
+;;       g (c/delay (dynaload 'clojure.test.check.generators/generate))
+;;       mkg (c/delay (dynaload 'clojure.test.check.generators/->Generator))]
+;;   (defn- generator?
+;;     [x]
+;;     (@g? x))
+;;   (defn- generator
+;;     [gfn]
+;;     (@mkg gfn))
+;;   (defn generate
+;;     "Generate a single value using generator."
+;;     [generator]
+;;     (@g generator)))
 
-(defn ^:skip-wiki delay-impl
-  [gfnd]
-  ;;N.B. depends on test.check impl details
-  (generator (fn [rnd size]
-               ((:gen @gfnd) rnd size))))
+;; (defn ^:skip-wiki delay-impl
+;;   [gfnd]
+;;   ;;N.B. depends on test.check impl details
+;;   (generator (fn [rnd size]
+;;                ((:gen @gfnd) rnd size))))
 
-(defmacro delay
-  "given body that returns a generator, returns a
-  generator that delegates to that, but delays
-  creation until used."
-  [& body]
-  `(delay-impl (c/delay ~@body)))
+;; (defmacro delay
+;;   "given body that returns a generator, returns a
+;;   generator that delegates to that, but delays
+;;   creation until used."
+;;   [& body]
+;;   `(delay-impl (c/delay ~@body)))
 
-(defn gen-for-name
-  "Dynamically loads test.check generator named s."
-  [s]
-  (let [g (dynaload s)]
-    (if (generator? g)
-      g
-      (throw (RuntimeException. (str "Var " s " is not a generator"))))))
+;; (defn gen-for-name
+;;   "Dynamically loads test.check generator named s."
+;;   [s]
+;;   (let [g (dynaload s)]
+;;     (if (generator? g)
+;;       g
+;;       (throw (RuntimeException. (str "Var " s " is not a generator"))))))
 
-(defmacro ^:skip-wiki lazy-combinator
-  "Implementation macro, do not call directly."
-  [s]
-  (let [fqn (c/symbol "clojure.test.check.generators" (name s))
-        doc (str "Lazy loaded version of " fqn)]
-    `(let [g# (c/delay (dynaload '~fqn))]
-       (defn ~s
-         ~doc
-         [& ~'args]
-         (apply @g# ~'args)))))
+;; (defmacro ^:skip-wiki lazy-combinator
+;;   "Implementation macro, do not call directly."
+;;   [s]
+;;   (let [fqn (c/symbol "clojure.test.check.generators" (name s))
+;;         doc (str "Lazy loaded version of " fqn)]
+;;     `(let [g# (c/delay (dynaload '~fqn))]
+;;        (defn ~s
+;;          ~doc
+;;          [& ~'args]
+;;          (apply @g# ~'args)))))
 
-(defmacro ^:skip-wiki lazy-combinators
-  "Implementation macro, do not call directly."
-  [& syms]
-  `(do
-     ~@(c/map
-        (fn [s] (c/list 'lazy-combinator s))
-        syms)))
+;; (defmacro ^:skip-wiki lazy-combinators
+;;   "Implementation macro, do not call directly."
+;;   [& syms]
+;;   `(do
+;;      ~@(c/map
+;;         (fn [s] (c/list 'lazy-combinator s))
+;;         syms)))
 
-(lazy-combinators hash-map list map not-empty set vector vector-distinct fmap elements
-                  bind choose fmap one-of such-that tuple sample return
-                  large-integer* double* frequency shuffle)
+;; (lazy-combinators hash-map list map not-empty set vector vector-distinct fmap elements
+;;                   bind choose fmap one-of such-that tuple sample return
+;;                   large-integer* double* frequency shuffle)
 
-(defmacro ^:skip-wiki lazy-prim
-  "Implementation macro, do not call directly."
-  [s]
-  (let [fqn (c/symbol "clojure.test.check.generators" (name s))
-        doc (str "Fn returning " fqn)]
-    `(let [g# (c/delay (dynaload '~fqn))]
-       (defn ~s
-         ~doc
-         [& ~'args]
-         @g#))))
+;; (defmacro ^:skip-wiki lazy-prim
+;;   "Implementation macro, do not call directly."
+;;   [s]
+;;   (let [fqn (c/symbol "clojure.test.check.generators" (name s))
+;;         doc (str "Fn returning " fqn)]
+;;     `(let [g# (c/delay (dynaload '~fqn))]
+;;        (defn ~s
+;;          ~doc
+;;          [& ~'args]
+;;          @g#))))
 
-(defmacro ^:skip-wiki lazy-prims
-  "Implementation macro, do not call directly."
-  [& syms]
-  `(do
-     ~@(c/map
-        (fn [s] (c/list 'lazy-prim s))
-        syms)))
+;; (defmacro ^:skip-wiki lazy-prims
+;;   "Implementation macro, do not call directly."
+;;   [& syms]
+;;   `(do
+;;      ~@(c/map
+;;         (fn [s] (c/list 'lazy-prim s))
+;;         syms)))
 
-(lazy-prims any any-printable boolean bytes char char-alpha char-alphanumeric char-ascii double
-            int keyword keyword-ns large-integer ratio simple-type simple-type-printable
-            string string-ascii string-alphanumeric symbol symbol-ns uuid)
+;; (lazy-prims any any-printable boolean bytes char char-alpha char-alphanumeric char-ascii double
+;;             int keyword keyword-ns large-integer ratio simple-type simple-type-printable
+;;             string string-ascii string-alphanumeric symbol symbol-ns uuid)
 
 (defn cat
   "Returns a generator of a sequence catenated from results of
